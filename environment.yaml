@@ -335,5 +335,7 @@ dependencies:
   - zope.event=4.4=py37_0
   - zope.interface=4.7.1=py37h7b6447c_0
   - zstd=1.4.5=h0b5b093_0
+  - pip:
+      - import-ipynb==0.1.4
 prefix: /home/tjtsai/anaconda2/envs/DropDTW
 

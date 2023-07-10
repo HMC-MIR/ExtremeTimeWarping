@@ -297,18 +297,17 @@ def run_multiple_benchmark(benchmarks, args):
         warp1, warp2, algorithm = benchmark
         start_time = time.time()
         run_single_benchmark(warp1, warp2, algorithm, args)
-        total_time = str(timedelta(seconds=int(time.time() - start_time)))
-        print(f"{algorithm} finished for {args.filelist} with {warp1} {warp2} in {total_time}")
-        print(f"Done with {args.completed} out of {args.total} ({args.completed*100/args.total:.2f}%) skipping {args.skip} experiments", end=" ")
+        total_time = time.time() - start_time
+        avg_time = total_time / (args.num_pairs - args.skip) if args.num_pairs != args.skip else None
+        print(f"{algorithm} finished for {args.filelist} with {warp1} {warp2} in {total_time:.3f} sec ({avg_time:.3f} avg)")
+        print(f"Done with {args.completed} out of {args.total} ({args.completed*100/args.total:.2f}%) skip {args.skip} experiments", end=" ")
         print("🏃", "💨"*args.mod, "\n", sep="")
-        time_lines.append([algorithm, warp1, warp2, total_time])
+        time_lines.append([algorithm, warp1, warp2, total_time, avg_time])
         args.skip = 0
-    end_run = str(timedelta(seconds=int(time.time() - start_run)))
+    end_run = time.time() - start_run
     with open(args.save_times, 'w') as f:
-        for time_line in time_lines:
-            algorithm, warp1, warp2, total_time = time_line
-            f.write(f"{algorithm},{warp1},{warp2},{total_time}\n")
-            print(f"{algorithm} with {warp1} {warp2} ran for {total_time}")
+        for algorithm, warp1, warp2, total_time, avg_time in time_lines:
+            f.write(f"{algorithm},{warp1},{warp2},{total_time},{avg_time}\n")
         f.write(f'Total run time for {args.filelist} was {end_run}')
     print(f'Total run time for {args.filelist} was {end_run}')
     print('='*40)
@@ -322,7 +321,7 @@ def get_benchmarks(algorithms, subseq=False):
 
 if __name__ == "__main__":
 
-    print(f"Changing open file limit for current user session to {FILE_LIMIT}😈")
+    print(f"Changing open file limit for current user session to {FILE_LIMIT} 😈")
     os.system(f'ulimit -n {FILE_LIMIT}')
 
     parser = argparse.ArgumentParser()
@@ -334,7 +333,7 @@ if __name__ == "__main__":
     parser.set_defaults(track_steps=False)
     args = parser.parse_args()
 
-    benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3', 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'DTW1_downsampleQuantized', 'DTW1_downsampleInterpolate', 'DTW1_upsampleQuantized', 'DTW1_upsampleInterpolate', 'DTW_adaptiveWeight1', 'DTW_adaptiveWeight2', 'DTW_selectiveTransitions2','DTW_selectiveTransitions3','DTW_selectiveTransitions4','DTW_selectiveTransitions5'])
+    benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3']) # , 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'DTW1_downsampleQuantized', 'DTW1_downsampleInterpolate', 'DTW1_upsampleQuantized', 'DTW1_upsampleInterpolate', 'DTW_adaptiveWeight1', 'DTW_adaptiveWeight2', 'DTW_selectiveTransitions2','DTW_selectiveTransitions3','DTW_selectiveTransitions4','DTW_selectiveTransitions5'])
 
     with open(f"cfg_files/{args.filelist}.txt", 'r') as f:
         args.num_pairs = sum(1 for _ in f)

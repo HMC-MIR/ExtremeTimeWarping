@@ -297,7 +297,7 @@ def run_multiple_benchmark(benchmarks, args):
         start_time = time.time()
         run_single_benchmark(warp1, warp2, algorithm, args)
         total_time = time.time() - start_time
-        avg_time = total_time / (args.num_pairs - args.skip) if args.num_pairs != args.skip else None
+        avg_time = total_time / (args.num_pairs - args.skip) if args.num_pairs != args.skip else 0
         print(f"{algorithm} finished for {args.filelist} with {warp1} {warp2} in {total_time:.3f} sec ({avg_time:.3f} avg)")
         print(f"Done with {args.completed} out of {args.total} ({args.completed*100/args.total:.2f}%) skip {args.skip} experiments", end=" ")
         print("🏃", "💨"*args.mod, "\n", sep="")

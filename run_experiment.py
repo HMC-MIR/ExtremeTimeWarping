@@ -330,8 +330,6 @@ if __name__ == "__main__":
     with open(f"cfg_files/filelist.{args.filelist}.txt", 'r') as f:
         args.num_pairs = sum(1 for _ in f)
 
-    print('='*40)
-    print(f"🎉 Running experiments for {args.filelist} 🎉")
-    print('='*40)
+    print('='*40, f"\n🎉 Running experiments for {args.filelist} 🎉\n", '='*40, '\n')
     run_multiple_benchmark(benchmarks, args)
 

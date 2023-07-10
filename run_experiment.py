@@ -2,17 +2,16 @@ from dtw_algorithm import DTW_Cost_To_AccumCostAndSteps, DTW_GetPath
 import numpy as np
 import librosa as lb
 import os.path
+import os
 from pathlib import Path
 import pickle
 import multiprocessing
 import time
 from datetime import timedelta
-from tqdm import tqdm
 import argparse
 
-
 N_CORES = 40
-
+FILE_LIMIT = 767789
 
 def alignDTW(featfile1, featfile2, steps, weights, method, WarpMax, outfile, subsequence):
 
@@ -102,12 +101,12 @@ def alignDTW(featfile1, featfile2, steps, weights, method, WarpMax, outfile, sub
         wp[0] = wp[0] * factor
 
     if outfile:
-        pickle.dump(wp, open(outfile, 'wb'))
+        with open(outfile, 'wb') as file:
+            pickle.dump(wp, file)
 
     if args.track_steps:
-        steps_outfile = str(outfile).replace(".pkl","_steps.pkl") # make outfile for steps tracking
         track_steps_dict['steps'] = steps
-        with open(steps_outfile, 'wb') as fp:
+        with open(str(outfile).replace(".pkl","_steps.pkl"), 'wb') as fp:
             pickle.dump(track_steps_dict, fp)
 
     # profile will mark times [before_accum_cost, after_accum_cost, after_path]
@@ -115,7 +114,7 @@ def alignDTW(featfile1, featfile2, steps, weights, method, WarpMax, outfile, sub
 
 
 def align_batch(querylist, featdir1, featdir2, outdir, steps, weights, method, warpMax, subsequence, args):
-    outdir.mkdir(parents=True, exist_ok=True)
+
     inputs = []
     with open(querylist, 'r') as f:
         for line in f:
@@ -126,11 +125,12 @@ def align_batch(querylist, featdir1, featdir2, outdir, steps, weights, method, w
             queryid = os.path.basename(parts[0]) + '__' + os.path.basename(parts[1])
             outfile = (outdir / queryid).with_suffix('.pkl')
             if os.path.exists(outfile):
-                return
-            inputs.append((featfile1, featfile2, steps, weights, method, warpMax, outfile, subsequence))
-    pool = multiprocessing.Pool(processes = N_CORES)
-    pool.starmap(alignDTW, inputs)
-    return
+                args.skip += 1
+            else:
+                inputs.append((featfile1, featfile2, steps, weights, method, warpMax, outfile, subsequence))
+    with multiprocessing.Pool(processes = N_CORES) as pool:
+        pool.starmap(alignDTW, inputs)
+        # with implicitly calls pool.close() after pool.starmap()
 
 
 def get_settings(algorithm):
@@ -280,32 +280,38 @@ def run_single_benchmark(warp1, warp2, algorithm, args):
     Inputs: 'train_toy', 'Mazurkas_median_x1.000', 'Mazurkas_median_x1.000', 'DTW1'
     Output: Run specified DTW algorithm for a single system description
     """
-    query_list = f'cfg_files/filelist.{args.filelist}.txt' # make 'train_toy' to actual file path --> 'cfg_files/filelist.train_toy.txt'
     featdir1 = Path(f"Mazurkas_median_{warp1}/features/clean")
     featdir2 = Path(f"Mazurkas_median_{warp2}/features/clean")
-    warp1 = warp1.replace('.','').replace('_subseq20','') # change for outdir
-    warp2 = warp2.replace('.','')
-    outdir = Path(f'{args.output}/{args.filelist}.{warp1}.{warp2}.{algorithm}')
-    # get alignment settings based on specified alignment type
+    outdir = Path(f'{args.output}/{algorithm}_{warp1}_{warp2}')
+    outdir.mkdir(parents=True, exist_ok=True)
     steps, weights, method, warpMax, subsequence = get_settings(algorithm)
-    align_batch(query_list, featdir1, featdir2, outdir, steps, weights, method, warpMax, subsequence, args)
-    args.pbar.update(args.num_pairs)
+
+    align_batch(f'cfg_files/{args.filelist}.txt', featdir1, featdir2, outdir, steps, weights, method, warpMax, subsequence, args)
+    args.completed += args.num_pairs
+    args.mod = (args.mod + 1) % 5
 
 
 def run_multiple_benchmark(benchmarks, args):
-    res = []
-    with tqdm(total=args.num_pairs * len(benchmarks)) as args.pbar:
-        for benchmark in benchmarks:
-            warp1, warp2, algorithm = benchmark
-            start_time = time.time()
-            run_single_benchmark(warp1, warp2, algorithm, args)
-            total_time = str(timedelta(seconds=int(time.time() - start_time)))
-            print(f"{algorithm} finished for {args.filelist} with {warp1} {warp2} in {total_time}")
-            res.append(f"{algorithm},{warp1},{warp2},{total_time}\n")
-    with open(args.save_times, 'a') as f:
-        for line in res:
-            f.write(line)
-
+    time_lines, args.completed, args.mod, args.skip, start_run = [], 0, 0, 0, time.time()
+    for benchmark in benchmarks:
+        warp1, warp2, algorithm = benchmark
+        start_time = time.time()
+        run_single_benchmark(warp1, warp2, algorithm, args)
+        total_time = str(timedelta(seconds=int(time.time() - start_time)))
+        print(f"{algorithm} finished for {args.filelist} with {warp1} {warp2} in {total_time}")
+        print(f"Done with {args.completed} out of {args.total} ({args.completed*100/args.total:.2f}%) skipping {args.skip} experiments", end=" ")
+        print("🏃", "💨"*args.mod, "\n", sep="")
+        time_lines.append([algorithm, warp1, warp2, total_time])
+        args.skip = 0
+    end_run = str(timedelta(seconds=int(time.time() - start_run)))
+    with open(args.save_times, 'w') as f:
+        for time_line in time_lines:
+            algorithm, warp1, warp2, total_time = time_line
+            f.write(f"{algorithm},{warp1},{warp2},{total_time}\n")
+            print(f"{algorithm} with {warp1} {warp2} ran for {total_time}")
+        f.write(f'Total run time for {args.filelist} was {end_run}')
+    print(f'Total run time for {args.filelist} was {end_run}')
+    print('='*40)
 
 def get_benchmarks(algorithms, subseq=False):
     subseq = '_subseq20' if subseq else ''
@@ -315,6 +321,9 @@ def get_benchmarks(algorithms, subseq=False):
 
 
 if __name__ == "__main__":
+
+    print(f"Changing open file limit for current user session to {FILE_LIMIT}😈")
+    os.system(f'ulimit -n {FILE_LIMIT}')
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--filelist", default='train_toy', type=str, help="data to run experiments on")
@@ -327,9 +336,10 @@ if __name__ == "__main__":
 
     benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3', 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'DTW1_downsampleQuantized', 'DTW1_downsampleInterpolate', 'DTW1_upsampleQuantized', 'DTW1_upsampleInterpolate', 'DTW_adaptiveWeight1', 'DTW_adaptiveWeight2', 'DTW_selectiveTransitions2','DTW_selectiveTransitions3','DTW_selectiveTransitions4','DTW_selectiveTransitions5'])
 
-    with open(f"cfg_files/filelist.{args.filelist}.txt", 'r') as f:
+    with open(f"cfg_files/{args.filelist}.txt", 'r') as f:
         args.num_pairs = sum(1 for _ in f)
 
-    print('='*40, f"\n🎉 Running experiments for {args.filelist} 🎉\n", '='*40, '\n')
+    args.total = args.num_pairs * len(benchmarks)
+    print('='*40, f"\n🎉 Running {args.total} experiments for {args.filelist} 🎉\n", sep="")
     run_multiple_benchmark(benchmarks, args)
 

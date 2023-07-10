@@ -7,7 +7,6 @@ from pathlib import Path
 import pickle
 import multiprocessing
 import time
-from datetime import timedelta
 import argparse
 
 N_CORES = 40
@@ -333,7 +332,7 @@ if __name__ == "__main__":
     parser.set_defaults(track_steps=False)
     args = parser.parse_args()
 
-    benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3']) # , 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'DTW1_downsampleQuantized', 'DTW1_downsampleInterpolate', 'DTW1_upsampleQuantized', 'DTW1_upsampleInterpolate', 'DTW_adaptiveWeight1', 'DTW_adaptiveWeight2', 'DTW_selectiveTransitions2','DTW_selectiveTransitions3','DTW_selectiveTransitions4','DTW_selectiveTransitions5'])
+    benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3', 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'DTW1_downsampleQuantized', 'DTW1_downsampleInterpolate', 'DTW1_upsampleQuantized', 'DTW1_upsampleInterpolate', 'DTW_adaptiveWeight1', 'DTW_adaptiveWeight2', 'DTW_selectiveTransitions2','DTW_selectiveTransitions3','DTW_selectiveTransitions4','DTW_selectiveTransitions5'])
 
     with open(f"cfg_files/{args.filelist}.txt", 'r') as f:
         args.num_pairs = sum(1 for _ in f)

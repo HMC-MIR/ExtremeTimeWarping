@@ -11,7 +11,7 @@ import argparse
 import tqdm
 from datetime import timedelta
 
-N_CORES = mp.cpu_count()
+N_CORES = 32
 
 def alignDTW(chroma1, chroma2, algorithm, steps, weights, warp_max, subsequence, outfile):
 
@@ -24,11 +24,11 @@ def alignDTW(chroma1, chroma2, algorithm, steps, weights, warp_max, subsequence,
     times.append(time.time())
 
     # apply downsampling or adaptive weights
-    if algorithm == "downsampleQuantized":
+    if algorithm == "downsampleQuantized" or algorithm == "DTW2_downsampleQuantized":
         # we wish to only select M columns of of F1 to get (12 x M)
         index = [int(round(x)) for x in np.linspace(0, N-1, M)]
         F1 = F1[:, index]
-    elif algorithm == "downsampleInterpolate":
+    elif algorithm == "downsampleInterpolate" or algorithm == "DTW2_downsampleInterpolate":
         # we want to multiply matrix (12 x N) by (N x M) to get (12 x M)
         transform = np.zeros((N, M))
         index = np.linspace(0, N-1, M) # M indices evenly spaced between [0, N-1]
@@ -44,10 +44,10 @@ def alignDTW(chroma1, chroma2, algorithm, steps, weights, warp_max, subsequence,
             transform[row, col] = left
             transform[row+1, col] = right
         F1 = F1 @ transform
-    elif algorithm == "upsampleQuantized":
+    elif algorithm == "upsampleQuantized" or algorithm == "DTW2_upsampleQuantized":
         index = [int(x) for x in np.linspace(0, M-1, N)]
         F2 = F2[:, index]
-    elif algorithm == "upsampleInterpolate":
+    elif algorithm == "upsampleInterpolate" or "DTW2_upsampleInterpolate":
         # we want to multiply matrix (12 x M) by (M x N) to get (12 x N)
         transform = np.zeros((M, N))
         index = np.linspace(0, M-1, N) # N indices evenly spaced between [0, M-1]
@@ -84,9 +84,9 @@ def alignDTW(chroma1, chroma2, algorithm, steps, weights, warp_max, subsequence,
     path, _, _, track_steps = get_path(D, s, params)
     times.append(time.time())
 
-    if algorithm == "downsampleQuantized" or algorithm == "downsampleInterpolate":
+    if algorithm == "downsampleQuantized" or algorithm == "downsampleInterpolate" or algorithm == "DTW2_downsampleQuantized" or algorithm == "DTW2_downsampleInterpolate":
         path[0] = path[0] * N / M
-    elif algorithm == "upsampleQuantized" or algorithm == "upsampleInterpolate":
+    elif algorithm == "upsampleQuantized" or algorithm == "upsampleInterpolate" or algorithm == "DTW2_upsampleQuantized" or algorithm == "DTW2_upsampleInterpolate":
         path[1] = path[1] * M / N
 
     times.append(time.time())
@@ -106,7 +106,7 @@ def get_settings(algorithm):
     weights = np.array([2,3,3])
     warp_max, subsequence = None, False
 
-    if algorithm == 'DTW2':
+    if algorithm == 'DTW2' or algorithm in ['DTW2_downsampleQuantized','DTW2_downsampleInterpolate','DTW2_upsampleQuantized','DTW2_upsampleInterpolate']:
         steps = np.array([1,1,1,2,2,1]).reshape((-1,2))
         weights = np.array([1,2,2])
     elif algorithm == 'DTW3':
@@ -195,6 +195,13 @@ def get_settings(algorithm):
         weights = np.array([1,1,2])
         warp_max, subsequence = 5, True
 
+    elif algorithm == 'DTW2_add3':
+        steps = np.array([1,1,1,2,2,1,1,3,3,1]).reshape((-1,2))
+        weights = np.array([1,2,2,4,4])
+    elif algorithm == 'DTW2_add4':
+        steps = np.array([1,1,1,2,2,1,1,3,3,1,1,4,4,1]).reshape((-1,2))
+        weights = np.array([1,2,2,4,4,5,5])
+
     return steps, weights, warp_max, subsequence
 
 
@@ -238,6 +245,8 @@ def get_benchmarks(algorithms, subseq=False):
     return [[f'{warp1}{subseq}', warp2, algorithm] for algorithm in algorithms
             for warp1, warp2 in [('x1.000', 'x1.000'), ('x1.260', 'x1.000'), ('x1.260', 'x0.794'),
                 ('x1.588', 'x0.794'), ('x1.588', 'x0.630'), ('x2.000', 'x0.630'), ('x2.000', 'x0.500')]]
+            # for warp1, warp2 in [('x0.500', 'x0.500'), ('x0.630', 'x0.630'), ('x0.794', 'x0.794'),
+            #     ('x1.000', 'x1.000'), ('x1.260', 'x1.260'), ('x1.588', 'x1.588'), ('x2.000', 'x2.000')]]
 
 
 if __name__ == "__main__":
@@ -251,7 +260,8 @@ if __name__ == "__main__":
     parser.set_defaults(track_steps=False)
     args = parser.parse_args()
 
-    benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3', 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'downsampleQuantized', 'downsampleInterpolate', 'adaptiveWeight1', 'adaptiveWeight2', 'selectiveTransitions2','selectiveTransitions3','selectiveTransitions4','selectiveTransitions5'])
+    #benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3', 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'downsampleQuantized', 'downsampleInterpolate', 'adaptiveWeight1', 'adaptiveWeight2', 'selectiveTransitions2','selectiveTransitions3','selectiveTransitions4','selectiveTransitions5'])
+    benchmarks = get_benchmarks(['DTW2_add3', 'DTW2_add4', 'DTW2_downsampleQuantized', 'DTW2_downsampleInterpolate', 'DTW2_upsampleQuantized', 'DTW2_upsampleInterpolate'])
     with open(f"cfg_files/{args.batch}.txt", 'r') as f:
         args.num_pairs = sum(1 for _ in f)
     print(f"Running {args.num_pairs * len(benchmarks)} experiments for {args.batch} 🤯")

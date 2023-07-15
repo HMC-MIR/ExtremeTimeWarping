@@ -198,9 +198,15 @@ def get_settings(algorithm):
     elif algorithm == 'DTW2_add3':
         steps = np.array([1,1,1,2,2,1,1,3,3,1]).reshape((-1,2))
         weights = np.array([1,2,2,4,4])
+    elif algorithm == 'DTW2w2_add3':
+        steps = np.array([1,1,1,2,2,1,1,3,3,1]).reshape((-1,2))
+        weights = np.array([1,2,2,3,3])
     elif algorithm == 'DTW2_add4':
         steps = np.array([1,1,1,2,2,1,1,3,3,1,1,4,4,1]).reshape((-1,2))
         weights = np.array([1,2,2,4,4,5,5])
+    elif algorithm == 'DTW2w2_add4':
+        steps = np.array([1,1,1,2,2,1,1,3,3,1,1,4,4,1]).reshape((-1,2))
+        weights = np.array([1,2,2,3,3,4,4])
 
     return steps, weights, warp_max, subsequence
 
@@ -261,7 +267,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     #benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3', 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'downsampleQuantized', 'downsampleInterpolate', 'adaptiveWeight1', 'adaptiveWeight2', 'selectiveTransitions2','selectiveTransitions3','selectiveTransitions4','selectiveTransitions5'])
-    benchmarks = get_benchmarks(['DTW2_add3', 'DTW2_add4', 'DTW2_downsampleQuantized', 'DTW2_downsampleInterpolate', 'DTW2_upsampleQuantized', 'DTW2_upsampleInterpolate'])
+    benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3', 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'DTW2_downsampleQuantized', 'DTW2_downsampleInterpolate', 'adaptiveWeight1', 'adaptiveWeight2', 'selectiveTransitions2','selectiveTransitions3','selectiveTransitions4','selectiveTransitions5'])
     with open(f"cfg_files/{args.batch}.txt", 'r') as f:
         args.num_pairs = sum(1 for _ in f)
     print(f"Running {args.num_pairs * len(benchmarks)} experiments for {args.batch} 🤯")

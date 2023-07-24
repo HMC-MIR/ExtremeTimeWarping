@@ -11,24 +11,20 @@ import argparse
 import tqdm
 from datetime import timedelta
 
-N_CORES = 32
+N_CORES = mp.cpu_count()
 
 def alignDTW(chroma1, chroma2, algorithm, steps, weights, warp_max, subsequence, outfile):
-
-    times = []
-    times.append(time.time())
 
     F1 = np.load(chroma1) # 12 x N
     F2 = np.load(chroma2) # 12 x M
     N, M = F1.shape[1], F2.shape[1] # we assume that N >= M
-    times.append(time.time())
 
     # apply downsampling or adaptive weights
-    if algorithm == "downsampleQuantized" or algorithm == "DTW2_downsampleQuantized":
+    if "downsampleQuantized" in algorithm:
         # we wish to only select M columns of of F1 to get (12 x M)
         index = [int(round(x)) for x in np.linspace(0, N-1, M)]
         F1 = F1[:, index]
-    elif algorithm == "downsampleInterpolate" or algorithm == "DTW2_downsampleInterpolate":
+    elif "downsampleInterpolate" in algorithm:
         # we want to multiply matrix (12 x N) by (N x M) to get (12 x M)
         transform = np.zeros((N, M))
         index = np.linspace(0, N-1, M) # M indices evenly spaced between [0, N-1]
@@ -44,10 +40,10 @@ def alignDTW(chroma1, chroma2, algorithm, steps, weights, warp_max, subsequence,
             transform[row, col] = left
             transform[row+1, col] = right
         F1 = F1 @ transform
-    elif algorithm == "upsampleQuantized" or algorithm == "DTW2_upsampleQuantized":
+    elif "upsampleQuantized" in algorithm:
         index = [int(x) for x in np.linspace(0, M-1, N)]
         F2 = F2[:, index]
-    elif algorithm == "upsampleInterpolate" or "DTW2_upsampleInterpolate":
+    elif "upsampleInterpolate" in algorithm:
         # we want to multiply matrix (12 x M) by (M x N) to get (12 x N)
         transform = np.zeros((M, N))
         index = np.linspace(0, M-1, N) # N indices evenly spaced between [0, M-1]
@@ -67,37 +63,29 @@ def alignDTW(chroma1, chroma2, algorithm, steps, weights, warp_max, subsequence,
         weights = np.array([N/M, 1])
     elif algorithm == "adaptiveWeight2":
         weights = np.array([N/M, 1, 1 + N/M])
-    times.append(time.time())
 
     # compute cost matrix
     C = 1 - F1.T @ F2
-    times.append(time.time())
 
     # run DTW algorithm
     x_steps = steps[:,0].astype(np.uint32) # horizontal steps
     y_steps = steps[:,1].astype(np.uint32) # veritcal steps
     params = {'x_steps': x_steps, 'y_steps': y_steps, 'weights': weights, 'subsequence': subsequence}
     D, s = get_accum_cost_and_steps(C, params, warp_max)
-    times.append(time.time())
 
     # retrieve paths and steps taken
     path, _, _, track_steps = get_path(D, s, params)
-    times.append(time.time())
 
-    if algorithm == "downsampleQuantized" or algorithm == "downsampleInterpolate" or algorithm == "DTW2_downsampleQuantized" or algorithm == "DTW2_downsampleInterpolate":
+    if "downsample" in algorithm:
         path[0] = path[0] * N / M
-    elif algorithm == "upsampleQuantized" or algorithm == "upsampleInterpolate" or algorithm == "DTW2_upsampleQuantized" or algorithm == "DTW2_upsampleInterpolate":
+    elif "upsample" in algorithm:
         path[1] = path[1] * M / N
 
-    times.append(time.time())
     if outfile:
         with open(outfile, 'wb') as f:
             pickle.dump(path, f)
         with open(str(outfile).replace(".pkl","_steps.pkl"), 'wb') as f:
             pickle.dump(track_steps, f)
-
-    times.append(time.time())
-    return algorithm, np.diff(times)
 
 
 def get_settings(algorithm):
@@ -106,7 +94,7 @@ def get_settings(algorithm):
     weights = np.array([2,3,3])
     warp_max, subsequence = None, False
 
-    if algorithm == 'DTW2' or algorithm in ['DTW2_downsampleQuantized','DTW2_downsampleInterpolate','DTW2_upsampleQuantized','DTW2_upsampleInterpolate']:
+    if 'DTW2' in algorithm:
         steps = np.array([1,1,1,2,2,1]).reshape((-1,2))
         weights = np.array([1,2,2])
     elif algorithm == 'DTW3':
@@ -214,8 +202,8 @@ def get_settings(algorithm):
 def get_jobs_for_benchmark(warp1, warp2, algorithm, args):
 
     # get directory with chroma features
-    featdir1 = Path(f"Mazurkas_median_{warp1}/features/clean")
-    featdir2 = Path(f"Mazurkas_median_{warp2}/features/clean")
+    featdir1 = Path(f"median_{warp1}/features/clean")
+    featdir2 = Path(f"median_{warp2}/features/clean")
 
     # desginate output directory
     outdir = Path(f'{args.output_dir}/{algorithm}_{warp1}_{warp2}')
@@ -246,28 +234,43 @@ def get_jobs_for_all_benchmark(benchmarks, args):
         jobs.extend(get_jobs_for_benchmark(warp1, warp2, algorithm, args))
     return jobs
 
+
 def get_benchmarks(algorithms, subseq=False):
+    """
+    Return a list of tuples containing two different time warp durations and an algorithm.
+    """
     subseq = '_subseq20' if subseq else ''
-    return [[f'{warp1}{subseq}', warp2, algorithm] for algorithm in algorithms
+    return [(f'{warp1}{subseq}', warp2, algorithm) for algorithm in algorithms
             for warp1, warp2 in [('x1.000', 'x1.000'), ('x1.260', 'x1.000'), ('x1.260', 'x0.794'),
                 ('x1.588', 'x0.794'), ('x1.588', 'x0.630'), ('x2.000', 'x0.630'), ('x2.000', 'x0.500')]]
-            # for warp1, warp2 in [('x0.500', 'x0.500'), ('x0.630', 'x0.630'), ('x0.794', 'x0.794'),
-            #     ('x1.000', 'x1.000'), ('x1.260', 'x1.260'), ('x1.588', 'x1.588'), ('x2.000', 'x2.000')]]
 
 
 if __name__ == "__main__":
 
-    # python3 run_experiment.py --batch train_toy --output experiments
-    # python3 run_experiment.py --batch train_small --output experiments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch", default='train_toy', type=str, help="data to run experiments on")
-    parser.add_argument("--output_dir", default='experiments', type=str, help="where to save experiments")
-    parser.add_argument('--track_steps', action='store_true', help='whether to save steps')
-    parser.set_defaults(track_steps=False)
+    parser.add_argument("--batch", required=True, type=str, help="data to run experiments on")
+    parser.add_argument("--output_dir", required=True, type=str, help="where to save experiments")
+    parser.add_argument("--dtw", action="store_true", help="run all normal DTW variants")
+    parser.add_argument("--down", action="store_true", help="run all downsample variants")
+    parser.add_argument("--up", action="store_true", help="run all upsample variants")
+    parser.add_argument("--adapt", action="store_true", help="run all adaptiveWeight variants")
+    parser.add_argument("--select", action="store_true", help="run all selectiveTransition variants")
     args = parser.parse_args()
 
-    #benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3', 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'downsampleQuantized', 'downsampleInterpolate', 'adaptiveWeight1', 'adaptiveWeight2', 'selectiveTransitions2','selectiveTransitions3','selectiveTransitions4','selectiveTransitions5'])
-    benchmarks = get_benchmarks(['DTW1', 'DTW2', 'DTW3', 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4', 'DTW2_downsampleQuantized', 'DTW2_downsampleInterpolate', 'adaptiveWeight1', 'adaptiveWeight2', 'selectiveTransitions2','selectiveTransitions3','selectiveTransitions4','selectiveTransitions5'])
+    algos = []
+    if args.dtw:
+        algos += ['DTW1', 'DTW2', 'DTW3', 'DTW4', 'DTW5', 'DTW1_add3', 'DTW1_add4']
+    if args.down:
+        algos += ['DTW2_downsampleQuantized', 'DTW2_downsampleInterpolate']
+    if args.up:
+        algos += ['DTW2_upsampleQuantized', 'DTW2_upsampleInterpolate']
+    if args.adapt:
+        algos += ['adaptiveWeight1', 'adaptiveWeight2']
+    if args.select:
+        algos += ['selectiveTransitions2','selectiveTransitions3','selectiveTransitions4','selectiveTransitions5']
+
+    benchmarks = get_benchmarks(algos)
+
     with open(f"cfg_files/{args.batch}.txt", 'r') as f:
         args.num_pairs = sum(1 for _ in f)
     print(f"Running {args.num_pairs * len(benchmarks)} experiments for {args.batch} 🤯")
@@ -279,16 +282,6 @@ if __name__ == "__main__":
     with mp.Pool(processes = N_CORES) as pool:
         results = pool.starmap(alignDTW, tqdm.tqdm(jobs, total=len(jobs)))
 
-    Path('times').mkdir(parents=True, exist_ok=True)
-
-    with open(f"times/{args.batch}_times.csv", 'w') as o:
-        o.write("algorithm,load_chroma,downsample_adaptive,compute_cost,accum_steps,get_path,upsample,output\n")
-        for algorithm, times in results:
-            load_chroma, downsample_adaptive, compute_cost, accum_steps, get_path, upsample, output = times
-            o.write(f"{algorithm},{load_chroma},{downsample_adaptive},{compute_cost},{accum_steps},{get_path},{upsample},{output}\n")
-
-    end = time.time() - start
-    print(f"Entire python script took {str(timedelta(seconds = int(end)))} 💨")
-
-
+    duration = time.time() - start
+    print(f"Entire python script took {str(timedelta(seconds = int(duration)))} 💨")
 

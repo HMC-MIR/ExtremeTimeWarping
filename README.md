@@ -4,22 +4,23 @@ Dynamic time warping (DTW) is a dynamic programming algorithm used determine the
 
 ## Environment setup 🏗️
 
-Create a new enviornment from this repo's yml file using any package manager.
+Create a new enviornment from this repo's yaml file using any package manager.
 
 ```console
-micromamba create -f env.yml
+micromamba create -f environment.yaml # create env
+micromamba activate DropDTW # activate env
 ```
 
 ## Running experiments 🧪
 
-Run experiments by running the following bash command. Batch options include: `train_toy`, `train_small`, `train_medium`, `train_full` and `test_full`. Experiments results will be saved in the directory specified by `output`.
+After constructing the data by running notebook `01_prepare_data.ipynb`. Run experiments by running the following bash command. Batch options include: `train_toy`, `train_small`, `train_medium`, `train_full` and `test_full`. Experiments results will be saved in the directory specified by `output`.
 
 The following algorithms are run via each flag:
-- dtw: DTW1, DTW2, DTW3, DTW4, DTW5, DTW1_add3, DTW1_add4
-- down: DTW2_downsampleQuantized, DTW2_downsampleInterpolate
-- up: DTW2_upsampleQuantized, DTW2_upsampleInterpolate
-- adapt: adaptiveWeight1-2
-- select: selectiveTransitions2-5
+- `dtw`: DTW1, DTW2, DTW3, DTW4, DTW5, DTW1_add3, DTW1_add4
+- `down`: DTW2_downsampleQuantized, DTW2_downsampleInterpolate
+- `up`: DTW2_upsampleQuantized, DTW2_upsampleInterpolate
+- `adapt`: adaptiveWeight1-2
+- `select`: selectiveTransitions2-5
 
 
 ```console
@@ -31,3 +32,17 @@ python3 02_run_experiment.py --batch train_toy \
 ## Results 💽
 
 Alignment results are saved in `results/`.
+
+## Altering DTW implementation
+
+To alter the original Cython implementation you will need to alter `dtw_algorithm.pyx`. To compile Cython, you will need to run the following command.
+
+```console
+python3 setup.py build_ext --inplace
+```
+
+If there are errors with importing numpy, manually the path to the package in your environment to the `CFLAG` environment variable.
+
+```console
+export CFLAGS="-I /home/apham/ttmp/micromamba/envs/DropDTW/lib/python3.7/site-packages/numpy/core/include $CFLAGS"
+```

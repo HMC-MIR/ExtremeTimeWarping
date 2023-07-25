@@ -1,4 +1,4 @@
-name: DropDTW
+name: DTW
 channels:
 - conda-forge
 - pkgs/main

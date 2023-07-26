@@ -15,12 +15,27 @@ N_CORES = mp.cpu_count()
 
 def alignDTW(chroma1, chroma2, algorithm, steps, weights, warp_max, subsequence, outfile):
 
-    F1 = np.load(chroma1) # 12 x N
-    F2 = np.load(chroma2) # 12 x M
-    N, M = F1.shape[1], F2.shape[1] # we assume that N >= M
+    if 'adaptiveHop' in algorithm:
+        base, version = os.path.split(chroma1)
+        version = version.replace(".npy", "")
+        base, mazurka = os.path.split(base)
+        base = os.path.split(os.path.split(base)[0])[0]
+        wav_file = Path(f"{base}/wav_22050_mono/{mazurka}/{version}").with_suffix(".wav")
+        y, sr = lb.core.load(wav_file, sr=22050)
+        length1 = str(chroma1)[:str(chroma1).index(os.sep)].split("_x")[-1]
+        length2 = str(chroma2)[:str(chroma2).index(os.sep)].split("_x")[-1]
+        factor = float(length1) / float(length2)
+        hop_length = round(512 * factor / 64.0) * 64
+        F1 = lb.feature.chroma_cqt(y, sr=sr, hop_length=hop_length, norm=2)
+        F2 = np.load(chroma2) # 12 x M
+        N, M = F1.shape[1], F2.shape[1]
+    else:
+        F1 = np.load(chroma1) # 12 x N
+        F2 = np.load(chroma2) # 12 x M
+        N, M = F1.shape[1], F2.shape[1] # we assume that N >= M
 
     # apply downsampling or adaptive weights
-    if "downsampleQuantized" in algorithm:
+    if "downsampleQuantized" in algorithm or "adaptiveHopDownsample" in algorithm:
         # we wish to only select M columns of of F1 to get (12 x M)
         index = [int(round(x)) for x in np.linspace(0, N-1, M)]
         F1 = F1[:, index]
@@ -76,7 +91,9 @@ def alignDTW(chroma1, chroma2, algorithm, steps, weights, warp_max, subsequence,
     # retrieve paths and steps taken
     path, _, _, track_steps = get_path(D, s, params)
 
-    if "downsample" in algorithm:
+    if "adaptiveHop" in algorithm:
+        path[0] = path[0] * factor
+    elif "downsample" in algorithm:
         path[0] = path[0] * N / M
     elif "upsample" in algorithm:
         path[1] = path[1] * M / N
@@ -255,6 +272,7 @@ if __name__ == "__main__":
     parser.add_argument("--up", action="store_true", help="run all upsample variants")
     parser.add_argument("--adapt", action="store_true", help="run all adaptiveWeight variants")
     parser.add_argument("--select", action="store_true", help="run all selectiveTransition variants")
+    parser.add_argument("--hop", action="store_true", help="run all adaptiveHop variants")
     args = parser.parse_args()
 
     algos = []
@@ -268,6 +286,8 @@ if __name__ == "__main__":
         algos += ['adaptiveWeight1', 'adaptiveWeight2']
     if args.select:
         algos += ['selectiveTransitions2','selectiveTransitions3','selectiveTransitions4','selectiveTransitions5']
+    if args.hop:
+        algos += ['DTW2_adaptiveHop','DTW2_adaptiveHopDownsample']
 
     benchmarks = get_benchmarks(algos)
 

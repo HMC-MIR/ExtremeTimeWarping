@@ -8,7 +8,7 @@ Create a new enviornment from this repo's yaml file using any package manager.
 
 ```console
 micromamba create -f environment.yaml # create env
-micromamba activate DropDTW # activate env
+micromamba activate DTW # activate env
 ```
 
 ## Running experiments 🧪
@@ -21,12 +21,13 @@ The following algorithms are run via each flag:
 - `up`: DTW2_upsampleQuantized, DTW2_upsampleInterpolate
 - `adapt`: adaptiveWeight1-2
 - `select`: selectiveTransitions2-5
+- `hop`: DTW2_adaptiveHop, DTW2_adaptiveHopDownsample
 
 
 ```console
 python3 02_run_experiment.py --batch train_toy \
     --output experiments_toy \
-    --dtw --down --up --adapt --select
+    --dtw --down --up --adapt --select --hop
 ```
 
 ## Results 💽

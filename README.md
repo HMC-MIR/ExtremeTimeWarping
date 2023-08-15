@@ -26,7 +26,7 @@ The following algorithms are run via each flag:
 
 ```console
 python3 02_run_experiment.py --batch train_toy \
-    --output experiments_toy \
+    --output_dir experiments_toy \
     --dtw --down --up --adapt --select --hop
 ```
 

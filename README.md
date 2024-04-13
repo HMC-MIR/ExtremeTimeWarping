@@ -47,3 +47,14 @@ If there are errors with importing numpy, manually the path to the package in yo
 ```console
 export CFLAGS="-I /home/apham/ttmp/micromamba/envs/DropDTW/lib/python3.7/site-packages/numpy/core/include $CFLAGS"
 ```
+
+
+## Citation
+
+Jittisa Kraprayoon, Austin Pham, and TJ Tsai.  “Improving the Robustness of DTW to Global Time Warping Conditions in Audio Synchronization.”  Applied Sciences, 14(4): 1459, 2024.
+
+
+
+### Acknowledgments
+
+This material is based upon work supported by the National Science Foundation under Grant No. 2144050.  Any opinions, findings, and conclusions or recommendations expressed in this material are those of the author(s) and do not necessarily reflect the views of the National Science Foundation.
